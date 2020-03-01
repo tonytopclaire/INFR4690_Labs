@@ -3,11 +3,12 @@
 # Date:           02/27/2019
 # Student Number: 100474399
 # Description:    All questions are based on Python 3 to get the bonus mark.	
+# 02/27/2020:	  Plan to combine the FAT & NTFS partition check for the final proejct.
+# 02/27/2020:	  Updated partitonID list.
 
 import sys
 import hashlib
 import binascii
-# Using a partition types table as a reference from https://github.com/shubham0d/MBR-extractor
 import partitionID
 
 # inherit and optimized functions from lab 5
@@ -20,6 +21,7 @@ currentFileName = "thumbimage_ntfs.dd"
 flag_ptt = "partition"
 flag_FAT = "FileAllocationTable"
 flag_FAT_FD ="fileDirectory"
+NTFS_fileName = "Canada.txt"
 
 # the function to read the file
 def extractMBR(path=""):
@@ -89,16 +91,12 @@ def parseInfo(rawData):
 			# call the function if the current partition type is FAT32
 			if (rawData[partion[x][4]] == "0b"):
 				FAT32Ana(extractMBR(currentFileName + "." + flag_ptt + str(x+1)),str(x+1))
-			print ("")
+			if (rawData[partion[x][4]] == "07"):
+				NTFSAna(extractMBR(currentFileName + "." + flag_ptt + str(x+1)),str(x+1))
 		else:
 			print("-----------------------No Partition found on disk-----------------------")
 
-# ---------------------------------------------------------------------------------------------------------
-# ---------------------------------------------------------------------------------------------------------
-# ---------------------------------------------------------------------------------------------------------
-# ---------------------------------------------------------------------------------------------------------
-
-# New function to extract partition boot sector from the FAT32 partition
+# FAT function to extract partition boot sector from the FAT32 partition
 def FAT32Ana(rawData,no): 
 	global sectorSize
 	global clusterSector
@@ -119,13 +117,13 @@ def FAT32Ana(rawData,no):
 	print ("Total file allocation number:  " + str(noOfFAT))
 	for x in range(noOfFAT):
 		print ("FAT " + str(x) + " Start sector: " + str(reservedArea + (x * FATSize)) + " End sector: " + str(reservedArea + ((x+1) * FATSize)-1))
-	print ("Cluster size in bytes of the FAT file system is:     " + str(clusterSize))
-	print ("The smallest cluster number of a FAT file system is: " + str(minNoCluster))
+	print ("Cluster size in bytes of the current FAT partition is:     " + str(clusterSize))
+	print ("The smallest cluster number of the current FAT partition is: " + str(minNoCluster))
 	if (noOfFAT == 2):
 		fileDirectoryStartSector = (reservedArea + (FATSize * 2))
 		fileDirectoryStartSectorinBytes = (reservedArea + (FATSize * 2)) * 512
 	else:
-		print("Number of FAT is incorrect.")
+		print ("Number of FAT is incorrect.")
 	# save the file directory data as a new file
 	saveData(fileDirectoryStartSectorinBytes,512,flag_FAT_FD,no)
 	# save the file allocation table data as a new file
@@ -133,7 +131,7 @@ def FAT32Ana(rawData,no):
 	extractDirectory(extractMBR(currentFileName + "." + flag_FAT_FD + no),flag_FAT_FD)	
 	extractDirectory(extractMBR(currentFileName + "." + flag_FAT + no),flag_FAT)	
 
-# New function to extract data from the directory
+# FAT function to extract data from the directory
 def extractDirectory(rawData,flag):
 	global fileSize
 	global startingCluster
@@ -164,6 +162,21 @@ def extractDirectory(rawData,flag):
 		print ("Number of Clusters allocated to readme file: " + str(noOfClusters))
 		print ("Number of Sectors allocated to readme file:  " + str((noOfClusters * clusterSector)))
 		print ("Size of Slack Space (bytes):                 " + str((noOfClusters * clusterSize) - fileSize))
+
+def NTFSAna(rawData,no): 
+	global NTFS_MFT_LocationInt
+	sectorSize = int(rawData[12] + rawData[11], 16)	
+	clusterSector = int(rawData[13], 16)
+	clusterSize = clusterSector * sectorSize
+	MFTSize = 1024
+	volumeSerialNo_1 = str.upper(rawData[75] + rawData[74])
+	volumeSerialNo_2 = str.upper(rawData[73] + rawData[72])
+	NTFS_MFT_LocationInt = ((int(rawData[55] + rawData[54] + rawData[53] + rawData[52] + rawData[51] + rawData[50] + rawData[49] + rawData[48],16)) * clusterSize)
+	MFT_StartCluster = int(NTFS_MFT_LocationInt / clusterSize)
+	print ("The volume serial number of partition " + no + " is " + volumeSerialNo_1 + " - " + volumeSerialNo_2)
+	print ("Cluster size in bytes of the current NTFS partition:     " + str(clusterSize))
+	print ("The first cluster of the MFT is " + str(MFT_StartCluster))
+	print ("The size of each Master File Table entry in bytes is " + str(MFTSize))
 
 parseInfo(extractMBR(currentFileName))
 
