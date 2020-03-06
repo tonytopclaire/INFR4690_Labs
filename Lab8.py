@@ -5,7 +5,9 @@
 # Description:    All questions are based on Python 3 to get the bonus mark.	
 # 02/27/2020:	  Plan to combine the FAT & NTFS partition check for the final proejct.
 # 02/27/2020:	  Updated partitonID list.
-
+# 03/06/2020:	  Goals: The target file cannot be recovered by any method.
+# 03/06/2020:	  Idea 1: Write 00 to offsets related to the search file.
+# 03/06/2020:	  Idea 2: Remove any evidence related to the search file had exsit before.
 import sys
 import hashlib
 import binascii
@@ -21,7 +23,7 @@ currentFileName = "thumbimage_ntfs.dd"
 flag_ptt = "partition"
 flag_FAT = "FileAllocationTable"
 flag_FAT_FD ="fileDirectory"
-NTFS_fileName = "Canada.txt"
+NTFS_File_Search = "Canada.txt"
 
 # the function to read the file
 def extractMBR(path=""):
@@ -45,6 +47,9 @@ def saveData(FATS,FATE,flag="",noOfPartition=""):
 		elif (flag == flag_FAT):
 			fp = open(currentFileName + "." + flag_ptt + noOfPartition, "rb")
 			print("File allocation table data of " + noOfPartition + " is saved as: " + currentFileName + "." + flag + noOfPartition)		
+		elif (flag == flag_FAT):
+			fp = open(currentFileName + "." + flag_ptt + noOfPartition, "rb")
+			print("File allocation table data of " + noOfPartition + " is saved as: " + currentFileName + "." + flag + noOfPartition)	
 		fp.seek(FATS)
 		mbr = fp.read(FATE)
 		f.write(mbr)
@@ -168,15 +173,31 @@ def NTFSAna(rawData,no):
 	sectorSize = int(rawData[12] + rawData[11], 16)	
 	clusterSector = int(rawData[13], 16)
 	clusterSize = clusterSector * sectorSize
-	MFTSize = 1024
+	MFT_Entry = 35
+	MFTSize = 1024 # NTFS default 
 	volumeSerialNo_1 = str.upper(rawData[75] + rawData[74])
 	volumeSerialNo_2 = str.upper(rawData[73] + rawData[72])
 	NTFS_MFT_LocationInt = ((int(rawData[55] + rawData[54] + rawData[53] + rawData[52] + rawData[51] + rawData[50] + rawData[49] + rawData[48],16)) * clusterSize)
 	MFT_StartCluster = int(NTFS_MFT_LocationInt / clusterSize)
+	MFT_Location = MFT_StartCluster * clusterSize
 	print ("The volume serial number of partition " + no + " is " + volumeSerialNo_1 + " - " + volumeSerialNo_2)
 	print ("Cluster size in bytes of the current NTFS partition:     " + str(clusterSize))
 	print ("The first cluster of the MFT is " + str(MFT_StartCluster))
 	print ("The size of each Master File Table entry in bytes is " + str(MFTSize))
+	saveFile((MFT_Location + MFT_Entry * MFTSize ),(512),NTFS_File_Search,no)
+
+def saveFile(FATS,FATE,flag="",noOfPartition=""):
+	try:
+		file = open(NTFS_File_Search + ".temp" , "wb")
+		if (flag == NTFS_File_Search):
+			fp = open(currentFileName + "." + flag_ptt + noOfPartition, "rb")
+			print("The Searching file --- " + NTFS_File_Search + "--- is saved locally.")
+		fp.seek(FATS)
+		mbr = fp.read(FATE)
+		file.write(mbr)
+	finally:
+		file.close()
+		fp.close()
+	return mbr
 
 parseInfo(extractMBR(currentFileName))
-
